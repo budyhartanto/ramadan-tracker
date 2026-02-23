@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Outfit } from 'next/font/google';
 import './globals.css';
+import { SessionProvider } from 'next-auth/react';
 
 const outfit = Outfit({
   subsets: ['latin'],
@@ -21,7 +22,9 @@ export default function RootLayout({
   return (
     <html lang="id" className={outfit.variable}>
       <body>
-        {children}
+        <SessionProvider>
+          {children}
+        </SessionProvider>
       </body>
     </html>
   );

@@ -8,17 +8,24 @@ import {
   Sun,
   BookOpen,
   CheckCircle2,
-  Circle
+  Circle,
+  LogOut
 } from 'lucide-react';
 import { DailyTracking } from '@/lib/db';
+import { useSession, signOut } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 
 export default function Home() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+
   const [currentDate, setCurrentDate] = useState<string>(() => {
     const today = new Date();
     return today.toISOString().split('T')[0];
   });
 
   const [data, setData] = useState<DailyTracking>({
+    user_id: '',
     date: currentDate,
     fasting: 0,
     fajr: 0,
@@ -33,7 +40,15 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/login');
+    }
+  }, [status, router]);
+
+  useEffect(() => {
     const fetchData = async () => {
+      if (status !== 'authenticated') return;
+
       setLoading(true);
       try {
         const response = await fetch(`/api/tracker?date=${currentDate}`);
@@ -48,7 +63,7 @@ export default function Home() {
       }
     };
     fetchData();
-  }, [currentDate]);
+  }, [currentDate, status]);
 
   const changeDate = (days: number) => {
     const d = new Date(currentDate);
@@ -101,11 +116,35 @@ export default function Home() {
     return Math.round((completed / 6) * 100);
   };
 
+  if (status === 'loading' || status === 'unauthenticated') {
+    return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Memuat Aplikasi...</div>;
+  }
+
   return (
     <main>
-      <header className="animate-in delay-1">
+      <header className="animate-in delay-1" style={{ position: 'relative' }}>
+        <button
+          onClick={() => signOut()}
+          style={{
+            position: 'absolute',
+            top: '1rem',
+            right: '1rem',
+            background: 'none',
+            border: 'none',
+            color: 'var(--text-secondary)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            fontSize: '0.9rem'
+          }}
+          title="Keluar"
+        >
+          <LogOut size={20} />
+          <span className="hidden-mobile">Keluar</span>
+        </button>
         <h1>Ramadan Tracker</h1>
-        <p className="subtitle">Lacak ibadah harianmu di bulan suci</p>
+        <p className="subtitle">Ahlan Wa Sahlan, <strong>{session?.user?.name}</strong>!</p>
       </header>
 
       {/* Date Navigation */}
@@ -127,7 +166,7 @@ export default function Home() {
       </section>
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '2rem' }}>Loading...</div>
+        <div style={{ textAlign: 'center', padding: '2rem' }}>Memuat data...</div>
       ) : (
         <>
           {/* Fasting Card */}
