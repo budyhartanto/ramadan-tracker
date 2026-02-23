@@ -10,7 +10,7 @@ export async function GET(request: Request) {
     }
 
     try {
-        const tracking = getTrackingByDate(date);
+        const tracking = await getTrackingByDate(date);
         return NextResponse.json(tracking);
     } catch (error) {
         console.error('Error fetching tracking data:', error);
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Date is required in the body' }, { status: 400 });
         }
 
-        updateTracking(body);
+        await updateTracking(body);
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error('Error updating tracking data:', error);

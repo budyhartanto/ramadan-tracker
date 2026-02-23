@@ -1,13 +1,17 @@
-import Database from 'better-sqlite3';
+import { createClient } from '@libsql/client';
 import path from 'path';
 
-const dbPath = path.join(process.cwd(), 'ramadan.db');
-const db = new Database(dbPath);
+// Load credentials from environment variables (Turso) or fallback to local file
+const url = process.env.TURSO_DATABASE_URL || `file:${path.join(process.cwd(), 'ramadan.db')}`;
+const authToken = process.env.TURSO_AUTH_TOKEN;
 
-db.pragma('journal_mode = WAL');
+const db = createClient({
+  url,
+  authToken,
+});
 
 // Initialize schema
-db.exec(`
+db.execute(`
   CREATE TABLE IF NOT EXISTS daily_tracking (
     date TEXT PRIMARY KEY,
     fasting BOOLEAN DEFAULT 0,
@@ -20,7 +24,7 @@ db.exec(`
     quran_ayah INTEGER DEFAULT 0,
     notes TEXT DEFAULT ''
   )
-`);
+`).catch(console.error);
 
 export interface DailyTracking {
   date: string;
@@ -35,11 +39,28 @@ export interface DailyTracking {
   notes: string;
 }
 
-export function getTrackingByDate(date: string): DailyTracking {
-  const stmt = db.prepare('SELECT * FROM daily_tracking WHERE date = ?');
-  const result = stmt.get(date) as DailyTracking | undefined;
+export async function getTrackingByDate(date: string): Promise<DailyTracking> {
+  const result = await db.execute({
+    sql: 'SELECT * FROM daily_tracking WHERE date = ?',
+    args: [date]
+  });
 
-  if (result) return result;
+  const row = result.rows[0];
+
+  if (row) {
+    return {
+      date: row.date as string,
+      fasting: Number(row.fasting),
+      fajr: Number(row.fajr),
+      dhuhr: Number(row.dhuhr),
+      asr: Number(row.asr),
+      maghrib: Number(row.maghrib),
+      isha: Number(row.isha),
+      quran_surah: row.quran_surah as string,
+      quran_ayah: Number(row.quran_ayah),
+      notes: row.notes as string
+    };
+  }
 
   // Return default if not exists
   return {
@@ -56,20 +77,22 @@ export function getTrackingByDate(date: string): DailyTracking {
   };
 }
 
-export function updateTracking(data: DailyTracking) {
-  const stmt = db.prepare(`
-    INSERT INTO daily_tracking (date, fasting, fajr, dhuhr, asr, maghrib, isha, quran_surah, quran_ayah, notes)
-    VALUES (@date, @fasting, @fajr, @dhuhr, @asr, @maghrib, @isha, @quran_surah, @quran_ayah, @notes)
-    ON CONFLICT(date) DO UPDATE SET
-      fasting = excluded.fasting,
-      fajr = excluded.fajr,
-      dhuhr = excluded.dhuhr,
-      asr = excluded.asr,
-      maghrib = excluded.maghrib,
-      isha = excluded.isha,
-      quran_surah = excluded.quran_surah,
-      quran_ayah = excluded.quran_ayah,
-      notes = excluded.notes
-  `);
-  stmt.run(data);
+export async function updateTracking(data: DailyTracking) {
+  await db.execute({
+    sql: `
+      INSERT INTO daily_tracking (date, fasting, fajr, dhuhr, asr, maghrib, isha, quran_surah, quran_ayah, notes)
+      VALUES (:date, :fasting, :fajr, :dhuhr, :asr, :maghrib, :isha, :quran_surah, :quran_ayah, :notes)
+      ON CONFLICT(date) DO UPDATE SET
+        fasting = excluded.fasting,
+        fajr = excluded.fajr,
+        dhuhr = excluded.dhuhr,
+        asr = excluded.asr,
+        maghrib = excluded.maghrib,
+        isha = excluded.isha,
+        quran_surah = excluded.quran_surah,
+        quran_ayah = excluded.quran_ayah,
+        notes = excluded.notes
+    `,
+    args: { ...data }
+  });
 }
