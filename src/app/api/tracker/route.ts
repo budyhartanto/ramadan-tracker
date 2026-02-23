@@ -2,10 +2,17 @@ import { NextResponse } from 'next/server';
 import { getTrackingByDate, updateTracking, DailyTracking } from '@/lib/db';
 import { auth } from '@/auth';
 
+export const dynamic = 'force-dynamic'; // Prevents Vercel from caching the GET request
+
 export async function GET(request: Request) {
     const session = await auth();
-    if (!session || !session.user || !session.user.id) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    console.log("Tracker API GET hit, session:", !!session);
+
+    // Fallback ID mechanisms depending on next-auth resolution variations
+    const userId = session?.user?.id || (session?.user as any)?.sub || session?.user?.email;
+
+    if (!session || !session.user || !userId) {
+        return NextResponse.json({ error: 'Unauthorized: Session missing user identity' }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
@@ -16,18 +23,22 @@ export async function GET(request: Request) {
     }
 
     try {
-        const tracking = await getTrackingByDate(session.user.id, date);
+        const tracking = await getTrackingByDate(userId, date);
         return NextResponse.json(tracking);
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error fetching tracking data:', error);
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+        return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
     }
 }
 
 export async function POST(request: Request) {
     const session = await auth();
-    if (!session || !session.user || !session.user.id) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    console.log("Tracker API POST hit, session:", !!session);
+
+    const userId = session?.user?.id || (session?.user as any)?.sub || session?.user?.email;
+
+    if (!session || !session.user || !userId) {
+        return NextResponse.json({ error: 'Unauthorized: Session missing user identity' }, { status: 401 });
     }
 
     try {
@@ -38,7 +49,7 @@ export async function POST(request: Request) {
         }
 
         const trackingData: DailyTracking = {
-            user_id: session.user.id,
+            user_id: userId,
             date: body.date,
             fasting: body.fasting ?? 0,
             fajr: body.fajr ?? 0,
@@ -53,8 +64,8 @@ export async function POST(request: Request) {
 
         await updateTracking(trackingData);
         return NextResponse.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error updating tracking data:', error);
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+        return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
     }
 }

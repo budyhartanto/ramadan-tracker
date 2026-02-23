@@ -54,19 +54,49 @@ export default function Home() {
 
       setLoading(true);
       try {
-        const response = await fetch(`/api/tracker?date=${currentDate}`);
+        // Prevent Vercel/Browser caching
+        const response = await fetch(`/api/tracker?date=${currentDate}&_t=${Date.now()}`);
         if (response.ok) {
           const result = await response.json();
           setData(result);
+        } else {
+          console.error("Tracker fetch failed", response.status);
+          // Fallback to empty default data to prevent UI bleeding from previous day
+          setData({
+            user_id: session?.user?.id || '',
+            date: currentDate,
+            fasting: 0,
+            fajr: 0,
+            dhuhr: 0,
+            asr: 0,
+            maghrib: 0,
+            isha: 0,
+            quran_surah: '',
+            quran_ayah: 0,
+            notes: ''
+          });
         }
       } catch (error) {
         console.error('Failed to fetch data', error);
+        setData({
+          user_id: session?.user?.id || '',
+          date: currentDate,
+          fasting: 0,
+          fajr: 0,
+          dhuhr: 0,
+          asr: 0,
+          maghrib: 0,
+          isha: 0,
+          quran_surah: '',
+          quran_ayah: 0,
+          notes: ''
+        });
       } finally {
         setLoading(false);
       }
     };
     fetchData();
-  }, [currentDate, status]);
+  }, [currentDate, status, session?.user?.id]);
 
   const changeDate = (days: number) => {
     const d = new Date(currentDate);
