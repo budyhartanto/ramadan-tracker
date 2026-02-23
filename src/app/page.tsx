@@ -21,7 +21,10 @@ export default function Home() {
 
   const [currentDate, setCurrentDate] = useState<string>(() => {
     const today = new Date();
-    return today.toISOString().split('T')[0];
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   });
 
   const [data, setData] = useState<DailyTracking>({
@@ -68,11 +71,18 @@ export default function Home() {
   const changeDate = (days: number) => {
     const d = new Date(currentDate);
     d.setDate(d.getDate() + days);
-    setCurrentDate(d.toISOString().split('T')[0]);
+
+    // Format safely to YYYY-MM-DD avoiding timezone offset issues
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    setCurrentDate(`${year}-${month}-${day}`);
   };
 
   const handleUpdate = async (updates: Partial<DailyTracking>) => {
+    // Merge the current full state immediately with the update slice
     const newData = { ...data, ...updates, date: currentDate };
+
     setData(newData); // Optimistic UI update
 
     try {
@@ -90,7 +100,9 @@ export default function Home() {
   };
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
+    const [year, month, day] = dateStr.split('-');
+    const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+
     return new Intl.DateTimeFormat('id-ID', {
       weekday: 'long',
       day: 'numeric',
